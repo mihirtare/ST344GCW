@@ -1,0 +1,38 @@
+---
+title: "Task1"
+author: "Mihir"
+date: "03/11/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, warnings = FALSE, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(rio)
+library(knitr)
+library(readxl)
+library(lubridate)
+```
+
+```{r data_manipulations}
+#Import
+maindat <- read_excel("edited_spotify.xlsx")
+View(maindat)
+
+#NA Removal
+maindat <- na.omit({ 
+  maindat %>%
+    group_by(Artist, AlbumName, AlbumReleaseDate, ArtistPopularity)
+})
+
+#Date Parsing
+maindat$AlbumReleaseDate = as.Date(parse_date_time(maindat$AlbumReleaseDate, orders = c("y", "ym", "ymd")))
+View(maindat)
+
+```
+
