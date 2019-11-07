@@ -32,16 +32,14 @@ maindat <- na.omit({
 
 #Date Parsing
 maindat$AlbumReleaseDate = as.Date(parse_date_time(maindat$AlbumReleaseDate, orders = c("y", "ym", "ymd")))
-View(maindat)
 
-
-#Calculating the PopularityRating for each album
+#Grouping data by albums because there is no data to calculate an individual track's popularity.
 albumdat = {maindat %>% 
     group_by(Artist,ArtistPopularity,AlbumName,
              AlbumReleaseDate,AlbumPopularity,ArtistNumFollowers,
              AlbumWeeksOnChart,AlbumWeeksNumberOne,
              AlbumBestChartPosition) %>% 
-    summarize(AlbumDuration = mean(TrackDuration),
+    summarise(AlbumDuration = mean(TrackDuration),
               AlbumDanceability = mean(TrackDanceability),
               AlbumEnergy = mean(TrackEnergy),
               AlbumLoudness = mean(TrackLoudness),
@@ -53,18 +51,64 @@ albumdat = {maindat %>%
               AlbumTempo = mean(TrackTempo)
                )}
 
+#Calculating the AlbumPopularityRating for each album.
 albumdat <- {albumdat %>% 
   group_by(Artist, AlbumName, AlbumReleaseDate) %>%
-    mutate(PopularityRating = 
+    mutate(AlbumPopularityRating = 
               ((ArtistPopularity + AlbumPopularity)/2) +
               (ArtistNumFollowers/10^7) +
               (AlbumWeeksOnChart/100) +
               (AlbumWeeksNumberOne/10) +
               (1 - (AlbumBestChartPosition/100))) 
               }
-View(albumdat)
+head(albumdat)
+
+#ArtistPopularityRating is an average of all AlbumPopularityRatings for that artist.
+artistdat <- {albumdat %>% 
+    group_by(Artist) %>%
+    summarise(ArtistPopularityRating = mean(AlbumPopularityRating))}
+head(artistdat)
+
+summary(albumdat)
+```
+
+
+```{r EDA, include = FALSE}
+plot.durationpop <- {albumdat %>% ggplot(aes(x = AlbumDuration,
+                                                y = PopularityRating))} +
+  geom_point()  + geom_smooth() + xlab("Album's Average Duration") +
+        ylab("Album's Popularity Rating") +
+        ggtitle("Duration vs Popularity")
+plot.durationpop
+
+plot.dancepop <- {albumdat %>% ggplot(aes(y = AlbumDanceability,
+                                                x = PopularityRating))} +
+  geom_point()  + geom_smooth() + ylab("Album's Average Danceability") +
+        xlab("Album's Popularity Rating") +
+        ggtitle("Popularity vs Danceability")
+plot.dancepop
+
+plot.energypop <- {albumdat %>% ggplot(aes(y = AlbumEnergy,
+                                                x = PopularityRating))} +
+  geom_point()  + geom_smooth() + ylab("Album's Average Energy") +
+        xlab("Album's Popularity Rating") +
+        ggtitle("Popularity vs AlbumEnergy")
+plot.energypop
+
+plot.speechypop <- {albumdat %>% ggplot(aes(y = AlbumSpeechiness,
+                                                x = PopularityRating))} +
+  geom_point()  + geom_smooth() + ylab("Album's Average Speechiness") +
+        xlab("Album's Popularity Rating") +
+        ggtitle("Popularity vs Speechiness")
+plot.speechypop
 
 
 ```
 
+```{r models}
 
+ggplot(albumdat, aes(x = AlbumPopularityRating, y = AlbumEnergy)) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+```
