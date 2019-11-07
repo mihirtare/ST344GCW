@@ -34,5 +34,37 @@ maindat <- na.omit({
 maindat$AlbumReleaseDate = as.Date(parse_date_time(maindat$AlbumReleaseDate, orders = c("y", "ym", "ymd")))
 View(maindat)
 
+
+#Calculating the PopularityRating for each album
+albumdat = {maindat %>% 
+    group_by(Artist,ArtistPopularity,AlbumName,
+             AlbumReleaseDate,AlbumPopularity,ArtistNumFollowers,
+             AlbumWeeksOnChart,AlbumWeeksNumberOne,
+             AlbumBestChartPosition) %>% 
+    summarize(AlbumDuration = mean(TrackDuration),
+              AlbumDanceability = mean(TrackDanceability),
+              AlbumEnergy = mean(TrackEnergy),
+              AlbumLoudness = mean(TrackLoudness),
+              AlbumSpeechiness = mean(TrackSpeechiness),
+              AlbumAcousticness = mean(TrackAcousticness),
+              AlbumInstrumentalness = mean(TrackInstrumentalness),
+              AlbumLiveness = mean(TrackLiveness),
+              AlbumValence = mean(TrackValence),
+              AlbumTempo = mean(TrackTempo)
+               )}
+
+albumdat <- {albumdat %>% 
+  group_by(Artist, AlbumName, AlbumReleaseDate) %>%
+    mutate(PopularityRating = 
+              ((ArtistPopularity + AlbumPopularity)/2) +
+              (ArtistNumFollowers/10^7) +
+              (AlbumWeeksOnChart/100) +
+              (AlbumWeeksNumberOne/10) +
+              (1 - (AlbumBestChartPosition/100))) 
+              }
+View(albumdat)
+
+
 ```
+
 
