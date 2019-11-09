@@ -17,61 +17,77 @@ library(rio)
 library(knitr)
 library(readxl)
 library(lubridate)
+library(caret)
+library(e1071)
 ```
 
-```{r data_manipulations}
+```{r data manipulations}
 #Import
-maindat <- read_excel("edited_spotify.xlsx")
-View(maindat)
 
-#NA Removal
-maindat <- na.omit({ 
-  maindat %>%
-    group_by(Artist, AlbumName, AlbumReleaseDate, ArtistPopularity)
-})
+albumdatgen <- function(){
+  maindat <- read_excel("edited_spotify.xlsx")
 
-#Date Parsing
-maindat$AlbumReleaseDate = as.Date(parse_date_time(maindat$AlbumReleaseDate, orders = c("y", "ym", "ymd")))
+  #NA Removal
+  maindat <- na.omit({ 
+    maindat %>%
+      group_by(Artist, AlbumName, AlbumReleaseDate, ArtistPopularity)
+  })
 
-#Grouping data by albums because there is no data to calculate an individual track's popularity.
-albumdat = {maindat %>% 
-    group_by(Artist,ArtistPopularity,AlbumName,
-             AlbumReleaseDate,AlbumPopularity,ArtistNumFollowers,
-             AlbumWeeksOnChart,AlbumWeeksNumberOne,
-             AlbumBestChartPosition) %>% 
-    summarise(AlbumDuration = mean(TrackDuration),
-              AlbumDanceability = mean(TrackDanceability),
-              AlbumEnergy = mean(TrackEnergy),
-              AlbumLoudness = mean(TrackLoudness),
-              AlbumSpeechiness = mean(TrackSpeechiness),
-              AlbumAcousticness = mean(TrackAcousticness),
-              AlbumInstrumentalness = mean(TrackInstrumentalness),
-              AlbumLiveness = mean(TrackLiveness),
-              AlbumValence = mean(TrackValence),
-              AlbumTempo = mean(TrackTempo)
-               )}
+  #Date Parsing
+  maindat$AlbumReleaseDate = as.Date(parse_date_time(
+    maindat$AlbumReleaseDate, orders = c("y", "ym", "ymd")))
 
-#Calculating the AlbumPopularityRating for each album.
-albumdat <- {albumdat %>% 
-  group_by(Artist, AlbumName, AlbumReleaseDate) %>%
-    mutate(AlbumPopularityRating = 
-              ((ArtistPopularity + AlbumPopularity)/2) +
-              (ArtistNumFollowers/10^7) +
-              (AlbumWeeksOnChart/100) +
-              (AlbumWeeksNumberOne/10) +
-              (1 - (AlbumBestChartPosition/100))) 
-              }
-head(albumdat)
+  #Grouping data by albums because there is no data to calculate an individual       track's popularity.
+  albumdat = {maindat %>% 
+      group_by(Artist,ArtistPopularity,AlbumName,
+               AlbumReleaseDate,AlbumPopularity,ArtistNumFollowers,
+               AlbumWeeksOnChart,AlbumWeeksNumberOne,
+               AlbumBestChartPosition) %>% 
+      summarise(AlbumDuration = mean(TrackDuration),
+                AlbumDanceability = mean(TrackDanceability),
+                AlbumEnergy = mean(TrackEnergy),
+                AlbumLoudness = mean(TrackLoudness),
+                AlbumSpeechiness = mean(TrackSpeechiness),
+                AlbumAcousticness = mean(TrackAcousticness),
+                AlbumInstrumentalness = mean(TrackInstrumentalness),
+                AlbumLiveness = mean(TrackLiveness),
+                AlbumValence = mean(TrackValence),
+                AlbumTempo = mean(TrackTempo)
+                 )}
+
+  #Calculating the AlbumPopularityRating and Decade for each album.
+  albumdat <- {albumdat %>% 
+    group_by(Artist, AlbumName, AlbumReleaseDate) %>%
+      mutate(AlbumPopularityRating = 
+                ((ArtistPopularity + AlbumPopularity)/2) +
+                floor((ArtistNumFollowers/10^6)) +
+                (AlbumWeeksOnChart/100) +
+                (AlbumWeeksNumberOne/10) +
+                (1 - (AlbumBestChartPosition/100)),
+             Decade = year(AlbumReleaseDate) -
+                year(AlbumReleaseDate) %% 10)
+                }
+  return(albumdat)
+}
 
 #ArtistPopularityRating is an average of all AlbumPopularityRatings for that artist.
-artistdat <- {albumdat %>% 
-    group_by(Artist) %>%
-    summarise(ArtistPopularityRating = mean(AlbumPopularityRating))}
-head(artistdat)
+#artistdat <- {albumdat %>% 
+ #   group_by(Artist) %>%
+  #  summarise(ArtistPopularityRating = mean(AlbumPopularityRating))}
 
-summary(albumdat)
+#Training data set generator.
+trainsetgen <- function(data, year){
+  return(filter(data, (Decade == year)))
+}
+
+#Testing data set generator.
+testsetgen <- function(){
+  intrain <- createDataPartition(y = albumdat$AlbumPopularityRating, 
+                                 p= 0.05, list = FALSE)
+  return(albumdat[intrain,])
+}
+
 ```
-
 
 ```{r EDA, include = FALSE}
 plot.durationpop <- {albumdat %>% ggplot(aes(x = AlbumDuration,
@@ -107,8 +123,59 @@ plot.speechypop
 
 ```{r models}
 
-ggplot(albumdat, aes(x = AlbumPopularityRating, y = AlbumEnergy)) + 
-  geom_point() +
-  stat_smooth(method = "lm", col = "red")
+```
 
+```{r knn algorithm, warnings = FALSE, message = FALSE}
+popularity_predictor <- function(artistname, album){
+  albumdat <- albumdatgen()
+  entry <- filter(albumdat, (Artist == artistname)&(AlbumName == album))
+  year <- entry$Decade
+  training_set <- trainsetgen(albumdat, year)
+  
+  #To control the nuances of our model training function, we set the resampling      method to repeated cross-validation with 10 resampling iterations and 3          complete sets of folds to compute for our repeated cross-validation
+  trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+  
+  pred1 <- train(AlbumPopularityRating ~ AlbumDanceability + 
+                          AlbumEnergy + AlbumLiveness + 
+                          AlbumValence, data = training_set, 
+                        method = "knn", trControl=trctrl, 
+                        preProcess = c("center", "scale"), tuneLength = 10)
+
+  pred2 <- train(AlbumPopularityRating ~  AlbumAcousticness +
+                          AlbumInstrumentalness, data = training_set, 
+                        method = "knn", trControl=trctrl, 
+                        preProcess = c("center", "scale"), tuneLength = 10)
+
+  pred3 <- train(AlbumPopularityRating ~ AlbumSpeechiness + 
+                        AlbumDuration, data = training_set, 
+                        method = "knn", trControl=trctrl, 
+                        preProcess = c("center", "scale"), tuneLength = 10)
+ 
+  poppred1 <-  predict(pred1, newdata = entry)
+  poppred2 <-  predict(pred2, newdata = entry)
+  poppred3 <-  predict(pred3, newdata = entry)
+  
+  poppred <- mean(poppred1, poppred2, poppred3)
+  entry <- {entry %>% group_by(Artist, AlbumName) %>%
+      mutate(PopularityPrediction = poppred)}
+  
+  return(entry$PopularityPrediction)
+}
+```
+
+```{r testing chunk, warnings = FALSE, message = FALSE}
+print(popularity_predictor("Scott Walker", "Scott 2"))
+
+View(albumdatgen())
+test_set <- testsetgen()
+test_pred1 <- predict(pred1, newdata = test_set)
+test_pred2 <- predict(pred2, newdata = test_set)
+test_pred3 <- predict(pred3, newdata = test_set)
+test_set$PopPred1 <- test_pred1
+test_set$PopPred2 <- test_pred2
+test_set$PopPred3 <- test_pred3
+test_set <- {test_set %>% group_by(Artist, AlbumName) %>%
+    mutate(PopPredAvg = mean(PopPred1,PopPred2,PopPred3))}
+#confusionMatrix()
+View(test_set)
 ```
