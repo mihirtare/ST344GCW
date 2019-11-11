@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r import}
 library(readxl)
+library(dplyr)
 Spotify <- read_excel("edited_spotify.xlsx")
 test <- read_excel("test_track.xlsx")
 ```
