@@ -18,10 +18,11 @@ library(knitr)
 library(readxl)
 library(lubridate)
 library(caret)
-library(e1071)
+library(stringr)
+#library(e1071)
 ```
 
-```{r data manipulations}
+```{r data manipulations, warnings = FALSE, message = FALSE}
 #Import
 
 albumdatgen <- function(){
@@ -89,48 +90,37 @@ testsetgen <- function(){
 
 ```
 
-```{r EDA, include = FALSE}
-plot.durationpop <- {albumdat %>% ggplot(aes(x = AlbumDuration,
-                                                y = PopularityRating))} +
-  geom_point()  + geom_smooth() + xlab("Album's Average Duration") +
-        ylab("Album's Popularity Rating") +
-        ggtitle("Duration vs Popularity")
-plot.durationpop
+```{r txt to df parser, warnings = FALSE, message = FALSE}
+fetch_test <- function(filename){
+  # e.g. filename = test_albums_2.txt
+  source <- paste("test_albums",filename, sep = "/")
+  TData <- read.table(source)
 
-plot.dancepop <- {albumdat %>% ggplot(aes(y = AlbumDanceability,
-                                                x = PopularityRating))} +
-  geom_point()  + geom_smooth() + ylab("Album's Average Danceability") +
-        xlab("Album's Popularity Rating") +
-        ggtitle("Popularity vs Danceability")
-plot.dancepop
+  test_data <- matrix(ncol = 2)
 
-plot.energypop <- {albumdat %>% ggplot(aes(y = AlbumEnergy,
-                                                x = PopularityRating))} +
-  geom_point()  + geom_smooth() + ylab("Album's Average Energy") +
-        xlab("Album's Popularity Rating") +
-        ggtitle("Popularity vs AlbumEnergy")
-plot.energypop
+  #Word selects all phrases between the commas
+  for (i in (1:dim(TData))) {
+    test_data <-
+      rbind(test_data, c(word(TData[i, 1], 1:2, sep = fixed(': '))))
+  }
 
-plot.speechypop <- {albumdat %>% ggplot(aes(y = AlbumSpeechiness,
-                                                x = PopularityRating))} +
-  geom_point()  + geom_smooth() + ylab("Album's Average Speechiness") +
-        xlab("Album's Popularity Rating") +
-        ggtitle("Popularity vs Speechiness")
-plot.speechypop
-
-
-```
-
-```{r models}
+  test_data <- test_data[-1, ]
+  test_data <- as_tibble(test_data)
+  colnames(test_data) <- c("Artist", "AlbumName")
+  
+  test_data <- filter(albumdat, (Artist %in% as.list(test_data$Artist)) &
+                       (AlbumName %in% as.list(test_data$AlbumName)))
+  
+  return(test_data)
+}
 
 ```
 
 ```{r knn algorithm, warnings = FALSE, message = FALSE}
-popularity_predictor <- function(artistname, album){
-  albumdat <- albumdatgen()
+run_knn <- function(artistname, album){
   entry <- filter(albumdat, (Artist == artistname)&(AlbumName == album))
-  year <- entry$Decade
-  training_set <- trainsetgen(albumdat, year)
+  decade <- entry$Decade
+  training_set <- trainsetgen(albumdat, decade)
   
   #To control the nuances of our model training function, we set the resampling      method to repeated cross-validation with 10 resampling iterations and 3          complete sets of folds to compute for our repeated cross-validation
   trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
@@ -163,19 +153,61 @@ popularity_predictor <- function(artistname, album){
 }
 ```
 
-```{r testing chunk, warnings = FALSE, message = FALSE}
-print(popularity_predictor("Scott Walker", "Scott 2"))
+```{r predictor, warnings = FALSE, message = FALSE}
+predict_popularity <- function(filename){
+  test_data <- fetch_test(filename)
+  
+  test_data <- test_data %>% group_by(Artist, AlbumName) %>%
+    mutate(PredictedPopularity = run_knn(Artist, AlbumName)) %>%
+    mutate(AbsolutePercentageError = 
+             (abs(PredictedPopularity - AlbumPopularityRating)/
+                AlbumPopularityRating)*100)
 
-View(albumdatgen())
-test_set <- testsetgen()
-test_pred1 <- predict(pred1, newdata = test_set)
-test_pred2 <- predict(pred2, newdata = test_set)
-test_pred3 <- predict(pred3, newdata = test_set)
-test_set$PopPred1 <- test_pred1
-test_set$PopPred2 <- test_pred2
-test_set$PopPred3 <- test_pred3
-test_set <- {test_set %>% group_by(Artist, AlbumName) %>%
-    mutate(PopPredAvg = mean(PopPred1,PopPred2,PopPred3))}
-#confusionMatrix()
-View(test_set)
+  print("The Mean Absolute % Error is: ")
+  View(test_data)
+  return(sum(test_data$AbsolutePercentageError)/length(test_data))
+}
+
 ```
+
+```{r test chunk, warnings = FALSE, message = FALSE}
+albumdat <- albumdatgen()
+test_set <- "test_albums_6.txt"
+predict_popularity(test_set)
+```
+
+---
+
+```{r EDA, include = FALSE}
+plot.durationpop <- {albumdat %>% ggplot(aes(x = AlbumDuration,
+                                                y = PopularityRating))} +
+  geom_point()  + geom_smooth() + xlab("Album's Average Duration") +
+        ylab("Album's Popularity Rating") +
+        ggtitle("Duration vs Popularity")
+plot.durationpop
+
+plot.dancepop <- {albumdat %>% ggplot(aes(y = AlbumDanceability,
+                                                x = PopularityRating))} +
+  geom_point()  + geom_smooth() + ylab("Album's Average Danceability") +
+        xlab("Album's Popularity Rating") +
+        ggtitle("Popularity vs Danceability")
+plot.dancepop
+
+plot.energypop <- {albumdat %>% ggplot(aes(y = AlbumEnergy,
+                                                x = PopularityRating))} +
+  geom_point()  + geom_smooth() + ylab("Album's Average Energy") +
+        xlab("Album's Popularity Rating") +
+        ggtitle("Popularity vs AlbumEnergy")
+plot.energypop
+
+plot.speechypop <- {albumdat %>% ggplot(aes(y = AlbumSpeechiness,
+                                                x = PopularityRating))} +
+  geom_point()  + geom_smooth() + ylab("Album's Average Speechiness") +
+        xlab("Album's Popularity Rating") +
+        ggtitle("Popularity vs Speechiness")
+plot.speechypop
+
+
+```
+
+---
