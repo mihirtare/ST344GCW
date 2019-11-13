@@ -56,7 +56,7 @@ albumdatgen <- function(){
                 AlbumTempo = mean(TrackTempo)
                  )}
 
-  #Calculating the AlbumPopularityRating and Decade for each album.
+  #Calculating the AlbumPopularityRating and ReleaseYear for each album.
   albumdat <- {albumdat %>% 
     group_by(Artist, AlbumName, AlbumReleaseDate) %>%
       mutate(AlbumPopularityRating = 
@@ -65,8 +65,7 @@ albumdatgen <- function(){
                 (AlbumWeeksOnChart/100) +
                 (AlbumWeeksNumberOne/10) +
                 (1 - (AlbumBestChartPosition/100)),
-             Decade = year(AlbumReleaseDate) -
-                year(AlbumReleaseDate) %% 10)
+             ReleaseYear = year(AlbumReleaseDate))
                 }
   return(albumdat)
 }
@@ -78,7 +77,21 @@ albumdatgen <- function(){
 
 #Training data set generator.
 trainsetgen <- function(data, year){
-  return(filter(data, (Decade == year)))
+  if(year <= 1964){
+    return(filter(data, (ReleaseYear <= 1964)))
+  }
+  else if(year > 1964 & year <= 1975){
+    return(filter(data, (ReleaseYear > 1964), (ReleaseYear <= 1975)))
+  }
+  else if(year > 1975 & year <= 1992){
+      return(filter(data, (ReleaseYear > 1975), (ReleaseYear <= 1992)))
+  }
+  else if(year > 1992 & year <= 2002){
+      return(filter(data, (ReleaseYear > 1992), (ReleaseYear <= 2002)))
+  }
+  else if(year > 2002){
+    return(filter(data, (ReleaseYear > 2002)))
+  }
 }
 
 #Testing data set generator.
@@ -119,8 +132,8 @@ fetch_test <- function(filename){
 ```{r knn algorithm, warnings = FALSE, message = FALSE}
 run_knn <- function(artistname, album){
   entry <- filter(albumdat, (Artist == artistname)&(AlbumName == album))
-  decade <- entry$Decade
-  training_set <- trainsetgen(albumdat, decade)
+  year <- entry$ReleaseYear
+  training_set <- trainsetgen(albumdat, year)
   
   #To control the nuances of our model training function, we set the resampling      method to repeated cross-validation with 10 resampling iterations and 3          complete sets of folds to compute for our repeated cross-validation
   trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
