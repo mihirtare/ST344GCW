@@ -1,0 +1,34 @@
+---
+title: "Group Plan"
+author: "Group 2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r TableChunk, echo = FALSE, results='asis'}
+library(knitr)
+library(kableExtra)
+TableData <- read.csv("ProjectPlan.csv")
+kable(TableData[1:16,], col.names = c("Task", "Doer","Start Date","End Date", "Checker", "Check Date"), 
+      align = c('c','c','c','c','c','c')) %>%
+  kable_styling('striped', full_width = T) %>%
+ pack_rows("Technical Appendix", 5, 8) %>%
+  pack_rows("PDF Document",9,15) %>%
+  pack_rows("Presentation",16,16)
+```
+
+
+
+
+Task          |  Doer         | Start Date  | End Date  | Checker       | Check Date  |
+  --------------------------|---------------|-------------|-----------|---------------|-------------|
+  Plan Write up             | Cameron       | 25/10/19    | 27/10/19  | All           | 28/10/19    |
+  Understand the Data       | All           | 22/10/19    | 27/10/19  | N/A           | N/A         |
+  Clean Data                | Ubaid/Cameron | 28/10/19    | 31/10/19  | Mihir/Ashley  | 31/10/19    |
+  EDA & Plan Programming    | All (Meeting) | 29/10/19    | 29/10/19  | N/A           | N/A         |
+                            |               |             |           |               |             |
+  Technical Appednix       
