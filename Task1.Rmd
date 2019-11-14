@@ -66,7 +66,8 @@ albumdatgen <- function(){
                 (AlbumWeeksNumberOne/10) +
                 (1 - (AlbumBestChartPosition/100)),
              ReleaseYear = year(AlbumReleaseDate))
-                }
+  }
+  albumdat[10:19] <- normalise(albumdat[10:19])
   return(albumdat)
 }
 
@@ -76,21 +77,24 @@ albumdatgen <- function(){
   #  summarise(ArtistPopularityRating = mean(AlbumPopularityRating))}
 
 #Training data set generator.
-trainsetgen <- function(data, year){
+trainsetgen <- function(test_data, data, year){
+    
+  #Training data excludes the entries from test_data
+  train_data <- anti_join(data, test_data, by = c("Artist", "AlbumName"))
   if(year <= 1964){
-    return(filter(data, (ReleaseYear <= 1964)))
+    return(filter(train_data, (ReleaseYear <= 1964)))
   }
   else if(year > 1964 & year <= 1975){
-    return(filter(data, (ReleaseYear > 1964), (ReleaseYear <= 1975)))
+    return(filter(train_data, (ReleaseYear > 1964), (ReleaseYear <= 1975)))
   }
   else if(year > 1975 & year <= 1992){
-      return(filter(data, (ReleaseYear > 1975), (ReleaseYear <= 1992)))
+      return(filter(train_data, (ReleaseYear > 1975), (ReleaseYear <= 1992)))
   }
   else if(year > 1992 & year <= 2002){
-      return(filter(data, (ReleaseYear > 1992), (ReleaseYear <= 2002)))
+      return(filter(train_data, (ReleaseYear > 1992), (ReleaseYear <= 2002)))
   }
   else if(year > 2002){
-    return(filter(data, (ReleaseYear > 2002)))
+    return(filter(train_data, (ReleaseYear > 2002)))
   }
 }
 
@@ -112,7 +116,7 @@ fetch_test <- function(filename){
   test_data <- matrix(ncol = 2)
 
   #Word selects all phrases between the commas
-  for (i in (1:dim(TData))) {
+  for (i in (1:dim(TData)[1])) {
     test_data <-
       rbind(test_data, c(word(TData[i, 1], 1:2, sep = fixed(': '))))
   }
@@ -130,10 +134,10 @@ fetch_test <- function(filename){
 ```
 
 ```{r knn algorithm, warnings = FALSE, message = FALSE}
-run_knn <- function(artistname, album){
+run_knn <- function(test_data, artistname, album){
   entry <- filter(albumdat, (Artist == artistname)&(AlbumName == album))
   year <- entry$ReleaseYear
-  training_set <- trainsetgen(albumdat, year)
+  training_set <- trainsetgen(test_data, albumdat, year)
   
   #To control the nuances of our model training function, we set the resampling      method to repeated cross-validation with 10 resampling iterations and 3          complete sets of folds to compute for our repeated cross-validation
   trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
@@ -171,7 +175,7 @@ predict_popularity <- function(filename){
   test_data <- fetch_test(filename)
   
   test_data <- test_data %>% group_by(Artist, AlbumName) %>%
-    mutate(PredictedPopularity = run_knn(Artist, AlbumName)) %>%
+    mutate(PredictedPopularity = run_knn(test_data, Artist, AlbumName)) %>%
     mutate(AbsolutePercentageError = 
              (abs(PredictedPopularity - AlbumPopularityRating)/
                 AlbumPopularityRating)*100)
@@ -185,8 +189,36 @@ predict_popularity <- function(filename){
 
 ```{r test chunk, warnings = FALSE, message = FALSE}
 albumdat <- albumdatgen()
-test_set <- "test_albums_6.txt"
+test_set <- "test_albums_1.txt"
 predict_popularity(test_set)
+```
+
+```{r normalise, warnings = FALSE, message = FALSE}
+normalise <- function(dat){
+  for(i in 1:ncol(dat)){
+    dat[i] <- (dat[i] - min(dat[i])) / (max(dat[i]) - min(dat[i]))
+  }
+  return(dat)
+}
+```
+
+```{r PCA, warnings = FALSE, message = FALSE}
+
+# Retrieve and normalise data
+pca_dat <- albumdatgen()
+pca_dat[10:19] <- normalise(pca_dat[10:19])
+#summary(pca_dat)
+
+# Finding the principal components
+pca <- princomp(pca_dat[10:19],cor="FALSE")
+
+pc <- pca$scores
+
+summary(pca)
+
+biplot(pca)
+
+screeplot(pca, type="lines")
 ```
 
 ---
