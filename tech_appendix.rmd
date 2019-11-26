@@ -1,12 +1,12 @@
 ---
 title: "ST344 Technical Appendix"
-author: "Group 2 - 1729346, 1711656, 1703980, 1601492"
+author: "Group 2 - 1729346, 1711656, 1703980, 1601492, 1941456"
 date: "26/11/2019"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.width = 1, fig.height = 1)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Exploratory Data Analysis
@@ -26,10 +26,15 @@ library(lubridate)
 # Extracting Data
 Spotify <- read_excel("edited_spotify.xlsx")
 
-MyData <- {Spotify %>% group_by(Artist, AlbumName, AlbumReleaseDate) %>% summarize(AlbumLoudness = mean(TrackLoudness), AlbumTempo = mean(TrackTempo), AlbumAcousticness = mean(TrackAcousticness))}
+MyData <- {Spotify %>% 
+    group_by(Artist, AlbumName, AlbumReleaseDate) %>% 
+    summarize(AlbumLoudness = mean(TrackLoudness), 
+              AlbumTempo = mean(TrackTempo), 
+              AlbumAcousticness = mean(TrackAcousticness))}
 
 # Date Parsing
-MyData$AlbumReleaseDate <- parse_date_time(MyData$AlbumReleaseDate, orders = c("y", "ym", "ymd"))
+MyData$AlbumReleaseDate <- parse_date_time(MyData$AlbumReleaseDate, 
+                                           orders = c("y", "ym", "ymd"))
 ```
 
 #### Correlation Plot
@@ -48,7 +53,9 @@ colnames(NewData) <- c("Energy","Danceability","Loudness",
                        "Liveliness","Valence","Tempo","Duration")
 
 cor <- cor(NewData)
-corrplot(cor,mar=c(0,0,2,0),type="lower",tl.srt = 30, tl.cex = 0.75, cl.cex = 0.5, title = "Figure 1: Correlation Plot of Spotify 'Audio Features Object'")
+corrplot(cor,mar=c(0,0,2,0),type="lower",
+         tl.srt = 30, tl.cex = 0.75, cl.cex = 0.5,
+         title = "Figure 1: Correlation Plot of Spotify 'Audio Features Object'")
 
 ```
 
@@ -96,6 +103,8 @@ ggplot(cumsum, aes(x = c(1:10), y = cumsum(prop_varex))) +
   geom_line(color="red")
 ```
 
+
+\pagebreak
 ## Task 1
 #### Libraries 
 The libraries used to complete this task were:
@@ -321,8 +330,19 @@ predict_popularity <- function(filename, pca){
 
 #### Test and Error Plot
 
-Finding the predictions for all test_sets using the two models and storing their errors.
-```{r test chunk, warnings = FALSE, message = FALSE, eval = FALSE}
+Finding the predictions for all test_sets using the two models and storing their errors. Note: This chunk takes a while to run due to retraining for each test element.
+```{r test chunk, include = FALSE, warnings = FALSE, message = FALSE}
+albumdat <- albumdatgen()
+errors.1 <- rep(-1,8)
+errors.2 <- rep(-1,8)
+for(i in 1:8){
+  test_set <- paste("test_albums_",i,".txt", sep = "")
+  errors.1[i] <- predict_popularity(test_set, pca=FALSE)
+  errors.2[i] <- predict_popularity(test_set, pca=TRUE)
+}
+```
+
+```{r test chunk_displ, eval = FALSE, warnings = FALSE, message = FALSE}
 albumdat <- albumdatgen()
 errors.1 <- rep(-1,8)
 errors.2 <- rep(-1,8)
@@ -334,7 +354,7 @@ for(i in 1:8){
 ```
 
 Plotting the errors for both models.
-```{r error plots, warnings = FALSE, message = FALSE, eval = FALSE}
+```{r error plots, warnings = FALSE, message = FALSE}
 A = data.frame(x = (errors.1), y=c(1:8))
 B = data.frame(x = errors.2, y=c(1:8))
 ggplot() +
@@ -380,7 +400,7 @@ df <- df[,cols]
 ```
 
 The *assignscore()* function is used to generate the 'scores'.
-```{r scores, warning = FASLE, message=FALSE}
+```{r scores}
 assignscore <- function(varname, test, df){
   valuelist = df[varname]
   min1 = min(valuelist)
@@ -404,7 +424,7 @@ Genres <- matrix()
 Genres <- matrix(ncol = 17)
 
 ##Using a for statement to find each individual Artist Genre
-for (i in (1:dim(df))) {
+for (i in (1:dim(df)[1])) {
   Genres <-
     rbind(Genres, c(word(df$ArtistGenres[i], 1:17, sep = fixed(','))))
 } #Word selects all phrases between the commas
@@ -491,7 +511,7 @@ df_total_score_wo_descri <- df %>%
 ```
 
 The following chunk contains the code for density plots of variables:
-```{r var plots, echo=FALSE, fig.height = 6, fig.width= 10}
+```{r var plots, echo=FALSE}
 par(mfrow=c(2,2))
 for (var in c("TrackSpeechiness","TrackInstrumentalness","TrackLiveness")){
   valuelist <- assignscore(var, test, df)
