@@ -261,4 +261,171 @@ ggplot() +
 
 \pagebreak
 ## Task 2
+#### Libraries 
+The libraries used to complete this task were:
+```{r librariest2, warning=FALSE,message=FALSE}
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(rio)
+library(tidyr)
+library(stringr)
+library(stringi)
+```
 
+#### Data Manipulations
+The following chunk contains all functions used for data manipulation/retreival.
+```{r datmanips, warning=FALSE,message=FALSE}
+# Data Import and Date Parsing
+Spotify_Data <- import("edited_spotify.xlsx", setclass = "tibble")
+Spotify<- na.omit({
+  Spotify_Data %>%
+    group_by(Artist, AlbumName, AlbumReleaseDate, ArtistPopularity)
+})
+Spotify$AlbumReleaseDate = as.Date(parse_date_time(Spotify$AlbumReleaseDate, orders = c("y", "ym", "ymd")))
+
+test <- read_excel("test_track1.xlsx")
+
+df <- data.frame(Spotify)
+cols <- c(1,3,6,13,17:27)
+df <- df[,cols]
+
+```
+
+The *assignscore()* function is used to generate the 'scores'.
+```{r scores, warning = FASLE, message=FALSE}
+assignscore <- function(varname, test, df){
+  valuelist = df[varname]
+  min1 = min(valuelist)
+  max1 = max(valuelist)
+  testinput = unlist(lapply(test[varname], "[[", 1))
+  len = length(valuelist)
+  for (i in (1:len)){
+    valuelist[i] <- 10 - floor(abs(valuelist[i]-testinput)/((max1-min1)/10))
+  }
+  return(valuelist)
+  #df[varname] <- valuelist
+}
+```
+
+```{r desriptive variables for later treatments, clean up Genre, echo = FALSE, warning=FALSE}
+varlist_cat <- list('Artist','AlbumName')
+varlist_score <- colnames(df)[5:15]
+
+##Creating a matrix from the Genres
+Genres <- matrix()
+Genres <- matrix(ncol = 17)
+
+##Using a for statement to find each individual Artist Genre
+for (i in (1:dim(df))) {
+  Genres <-
+    rbind(Genres, c(word(df$ArtistGenres[i], 1:17, sep = fixed(','))))
+} #Word selects all phrases between the commas
+
+##Removing 1st line from matrix formation and adding TrackName column
+Genres <- Genres[-1, ]
+Genres <- cbind(df$TrackName, Genres)
+
+##Making matrix into a dataframe, and naming column names
+Task2_Data <- as.data.frame(Genres)
+colnames(Task2_Data) <-
+  c(
+    "TrackName",
+    "Genre1",
+    "Genre2",
+    "Genre3",
+    "Genre4",
+    "Genre5",
+    "Genre6",
+    "Genre7",
+    "Genre8",
+    "Genre9",
+    "Genre10",
+    "Genre11",
+    "Genre12",
+    "Genre13",
+    "Genre14",
+    "Genre15",
+    "Genre16",
+    "Genre17"
+  )
+
+##Merging Genre Data with Main Data to make out Dataframe
+df <- merge(df, Task2_Data, by = ("TrackName"))
+```
+
+
+```{r, echo = FALSE, warning=FALSE}
+test_artist = unlist(lapply(test['Artist'], "[[", 1))
+test_album = unlist(lapply(test['AlbumName'], "[[", 1))
+test_genre = unlist(lapply(test['ArtistGenres'], "[[", 1))
+test_genre <- c(word(df$ArtistGenres[i], 1:17, sep = fixed(',')))
+```
+
+```{r check for basic info, echo = FALSE, warning=FALSE}
+for (i in (1:length(df['TrackName']))){
+  df['Artist'][i] <- ifelse(df['Artist'][i] == test_artist, 10, 0)
+  df['AlbumName'][i] <- ifelse(df['AlbumName'][i] == test_album, 10, 0)
+  df['Genre1'][i] <- ifelse(df['Genre1'][i] %in% test_genre, 5, 0)
+  df['Genre2'][i] <- ifelse(df['Genre2'][i] %in% test_genre, 5, 0)
+  df['Genre3'][i] <- ifelse(df['Genre3'][i] %in% test_genre, 5, 0)
+  df['Genre4'][i] <- ifelse(df['Genre4'][i] %in% test_genre, 5, 0)
+  df['Genre5'][i] <- ifelse(df['Genre5'][i] %in% test_genre, 5, 0)
+  df['Genre6'][i] <- ifelse(df['Genre6'][i] %in% test_genre, 5, 0)
+  df['Genre7'][i] <- ifelse(df['Genre7'][i] %in% test_genre, 5, 0)
+  df['Genre8'][i] <- ifelse(df['Genre8'][i] %in% test_genre, 5, 0)
+  df['Genre9'][i] <- ifelse(df['Genre9'][i] %in% test_genre, 5, 0)
+  df['Genre10'][i] <- ifelse(df['Genre10'][i] %in% test_genre, 5, 0)
+  df['Genre11'][i] <- ifelse(df['Genre11'][i] %in% test_genre, 5, 0)
+  df['Genre12'][i] <- ifelse(df['Genre12'][i] %in% test_genre, 5, 0)
+  df['Genre13'][i] <- ifelse(df['Genre13'][i] %in% test_genre, 5, 0)
+  df['Genre14'][i] <- ifelse(df['Genre14'][i] %in% test_genre, 5, 0)
+  df['Genre15'][i] <- ifelse(df['Genre15'][i] %in% test_genre, 5, 0)
+  df['Genre16'][i] <- ifelse(df['Genre16'][i] %in% test_genre, 5, 0)
+  df['Genre17'][i] <- ifelse(df['Genre17'][i] %in% test_genre, 5, 0)
+}
+
+```
+
+```{r t2.1, echo = FALSE, warning=FALSE}
+for (var in varlist_score){
+  valuelist <- assignscore(var, test, df)
+  df[var] <- valuelist
+}
+```
+
+```{r t2.2, echo = FALSE, warning=FALSE}
+df_total_score_w_descri <- df %>% 
+  mutate(Total = select(., c(Artist, AlbumName, Genre1:Genre17, 
+                             TrackDanceability:TrackTempo)) %>% 
+           rowSums(na.rm = TRUE))
+df_total_score_wo_descri <- df %>% 
+  mutate(Total = select(., c(TrackDanceability:TrackTempo)) %>% 
+           rowSums(na.rm = TRUE))
+```
+
+The following chunk contains the code for density plots of variables:
+```{r var plots, echo=FALSE, fig.height = 6, fig.width= 10}
+par(mfrow=c(2,2))
+for (var in c("TrackSpeechiness","TrackInstrumentalness","TrackLiveness")){
+  valuelist <- assignscore(var, test, df)
+  df[var] <- valuelist
+  min <- min(Spotify[var])
+  max <- max(Spotify[var])
+  range <- max - min
+  range <- signif(range, digits = 3)
+ 
+  mean <- mean(unlist(df_total_score_w_descri[var]))
+  mean <- signif(mean, digits = 3)
+  x <- as.numeric(unlist(Spotify[var]))
+  iqr <- IQR(x)
+  iqr <- signif(iqr, digits = 3)
+  title <- paste("Mean: ", mean)
+  sub <- sd(unlist(df_total_score_w_descri[var]))
+  sub <- paste("Range: ", range, ", IQR: ", iqr )
+  plot(density(x), main = var, ylab = "Density", xlab = "Spotify API Score", xlim = c(0:1), ylim = c(0,35))
+  abline(v=as.numeric(test[var]), col = "red")
+  mtext(title, 1, line = 4, cex = 0.75)
+  mtext(sub, 1, line = 5, cex = 0.75)
+}
+```
